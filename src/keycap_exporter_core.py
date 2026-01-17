@@ -232,8 +232,7 @@ def build_keycap_with_legend_shape(
     direction = FACE_DIRECTIONS.get(export_configuration.face_choice_label)
     if direction is None:
         raise ValueError(f"Unknown face choice: {export_configuration.face_choice_label}")
-    if export_configuration.depth_millimeter <= 0.0:
-        raise ValueError("Legend height or depth must be > 0.")
+
 
     face = best_face_for_direction(template_shape, direction_world=direction)
     face_placement, _ = face_plane_placement(face)
@@ -249,11 +248,14 @@ def build_keycap_with_legend_shape(
         App.Vector(export_configuration.offset_x_millimeter, export_configuration.offset_y_millimeter, 0.0)
     )
 
-    overlap = 0.00
-    legend_shape.translate(App.Vector(0.0, 0.0, -overlap))
     legend_shape.Placement = face_placement.multiply(legend_shape.Placement)
+    
+    if export_configuration.mode == "raise":
+        extrusion_vector = unit_vector(direction).multiply(export_configuration.depth_millimeter)
 
-    extrusion_vector = unit_vector(direction).multiply(export_configuration.depth_millimeter)
+    if export_configuration.mode == "engrave":
+        extrusion_vector = unit_vector(direction).multiply(-export_configuration.depth_millimeter)
+
     legend_solid = extrude_to_solid(legend_shape, extrusion_vector)
 
     blank_key = template_shape.copy()
