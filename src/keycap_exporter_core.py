@@ -255,7 +255,7 @@ def build_keycap_with_legend_shape(
         App.Vector(export_configuration.offset_x_millimeter, export_configuration.offset_y_millimeter, 0.0)
     )
 
-    overlap = 0.05
+    overlap = 0.00
     legend_shape.translate(App.Vector(0.0, 0.0, -overlap))
     legend_shape.Placement = face_placement.multiply(legend_shape.Placement)
 
