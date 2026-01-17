@@ -39,6 +39,10 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         for face_label in FACE_DIRECTIONS.keys():
             self.face_selector.addItem(face_label)
 
+        self.legend_direction_selector = QtWidgets.QComboBox()
+        for face_label in FACE_DIRECTIONS.keys():
+            self.legend_direction_selector.addItem(face_label)
+
         self.include_variable_fonts_checkbox = QtWidgets.QCheckBox("Include variable fonts")
         self.include_variable_fonts_checkbox.setChecked(False)
         self.include_variable_fonts_checkbox.stateChanged.connect(self.reload_fonts)
@@ -103,6 +107,7 @@ class BatchKeycapDialog(QtWidgets.QDialog):
             form_layout.addRow("Template object:", self.template_selector)
 
         form_layout.addRow("Legend face:", self.face_selector)
+        form_layout.addRow("Legend direction:", self.legend_direction_selector)
 
         font_row = QtWidgets.QHBoxLayout()
         font_row.addWidget(self.font_selector)
@@ -197,6 +202,7 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         return ExportConfiguration(
             template_object_name=template_name,
             face_choice_label=self.face_selector.currentText().strip(),
+            legend_direction_label=self.legend_direction_selector.currentText().strip(),
             font_path=font_path,
             output_directory=self.output_directory_edit.text().strip(),
             mode=self.mode_selector.currentText().strip().lower(),

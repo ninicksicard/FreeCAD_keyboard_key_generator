@@ -28,6 +28,7 @@ def generate_keycaps_to_stl_from_selected_template(keys: List[Tuple[str, str]]) 
 
     App.Console.PrintMessage(f"Template: {export_configuration.template_object_name}\n")
     App.Console.PrintMessage(f"Face: {export_configuration.face_choice_label}\n")
+    App.Console.PrintMessage(f"Legend direction: {export_configuration.legend_direction_label}\n")
     App.Console.PrintMessage(f"Font: {export_configuration.font_path}\n")
     App.Console.PrintMessage(f"Output: {export_configuration.output_directory}\n")
 
