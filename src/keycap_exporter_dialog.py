@@ -228,6 +228,7 @@ class BatchKeycapDialog(QtWidgets.QDialog):
             face_choice_label=self.face_selector.currentText().strip(),
             font_path=font_path,
             output_directory=self.output_directory_edit.text().strip(),
+            layout_file_path=self.layout_file_edit.text().strip(),
             mode=self.mode_selector.currentText().strip().lower(),
             size_millimeter=float(self.size_spin_box.value()),
             depth_millimeter=float(self.depth_spin_box.value()),

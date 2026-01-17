@@ -8,23 +8,6 @@ import Mesh
 import Part
 
 
-KEYS_TO_EXPORT: List[Tuple[str, str]] = [
-    ("ESC", "ESC"),
-    ("1", "1"),
-    ("2", "2"),
-    ("3", "3"),
-    ("Q", "Q"),
-    ("W", "W"),
-    ("E", "E"),
-    ("A", "A"),
-    ("S", "S"),
-    ("D", "D"),
-    ("Z", "Z"),
-    ("X", "X"),
-    ("C", "C"),
-    ("SPACE", "SPACE"),
-]
-
 DEFAULT_FONT_DIRECTORIES: List[str] = [
     "/usr/share/fonts",
     "/usr/local/share/fonts",
@@ -48,6 +31,7 @@ class ExportConfiguration:
     face_choice_label: str
     font_path: str
     output_directory: str
+    layout_file_path: str
     mode: str
     size_millimeter: float
     depth_millimeter: float
