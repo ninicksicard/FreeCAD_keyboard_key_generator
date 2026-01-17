@@ -53,6 +53,9 @@ class ExportConfiguration:
     depth_millimeter: float
     offset_x_millimeter: float
     offset_y_millimeter: float
+    extrusion_vector_x: float
+    extrusion_vector_y: float
+    extrusion_vector_z: float
     linear_deflection: float
     preview_label: str
 
@@ -179,9 +182,11 @@ def shapestring_shape(document: App.Document, label: str, font_path: str, size_m
     return shape
 
 
-def extrude_to_solid(shape: Part.Shape, height_millimeter: float) -> Part.Shape:
-    if height_millimeter <= 0.0:
-        raise ValueError("Legend height or depth must be > 0.")
+def extrude_to_solid(shape: Part.Shape, height_millimeter: float, extrusion_vector: App.Vector) -> Part.Shape:
+    if extrusion_vector.Length <= 0.0:
+        if height_millimeter <= 0.0:
+            raise ValueError("Legend height or depth must be > 0.")
+        extrusion_vector = App.Vector(0.0, 0.0, height_millimeter)
 
     if shape.ShapeType == "Wire":
         shape = Part.Face(shape)
@@ -190,7 +195,7 @@ def extrude_to_solid(shape: Part.Shape, height_millimeter: float) -> Part.Shape:
             faces = [Part.Face(wire) for wire in shape.Wires]
             shape = Part.makeCompound(faces)
 
-    return shape.extrude(App.Vector(0.0, 0.0, height_millimeter))
+    return shape.extrude(extrusion_vector)
 
 
 def shape_to_mesh(shape: Part.Shape, linear_deflection: float) -> "Mesh.Mesh":
@@ -254,7 +259,15 @@ def build_keycap_with_legend_shape(
     legend_shape.translate(App.Vector(0.0, 0.0, -overlap))
     legend_shape.Placement = face_placement.multiply(legend_shape.Placement)
 
-    legend_solid = extrude_to_solid(legend_shape, export_configuration.depth_millimeter)
+    legend_solid = extrude_to_solid(
+        legend_shape,
+        export_configuration.depth_millimeter,
+        App.Vector(
+            export_configuration.extrusion_vector_x,
+            export_configuration.extrusion_vector_y,
+            export_configuration.extrusion_vector_z,
+        ),
+    )
 
     blank_key = template_shape.copy()
 

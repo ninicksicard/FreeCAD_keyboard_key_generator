@@ -77,6 +77,21 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         self.offset_y_spin_box.setDecimals(2)
         self.offset_y_spin_box.setValue(0.0)
 
+        self.extrusion_vector_x_spin_box = QtWidgets.QDoubleSpinBox()
+        self.extrusion_vector_x_spin_box.setRange(-50.0, 50.0)
+        self.extrusion_vector_x_spin_box.setDecimals(2)
+        self.extrusion_vector_x_spin_box.setValue(0.0)
+
+        self.extrusion_vector_y_spin_box = QtWidgets.QDoubleSpinBox()
+        self.extrusion_vector_y_spin_box.setRange(-50.0, 50.0)
+        self.extrusion_vector_y_spin_box.setDecimals(2)
+        self.extrusion_vector_y_spin_box.setValue(0.0)
+
+        self.extrusion_vector_z_spin_box = QtWidgets.QDoubleSpinBox()
+        self.extrusion_vector_z_spin_box.setRange(-50.0, 50.0)
+        self.extrusion_vector_z_spin_box.setDecimals(2)
+        self.extrusion_vector_z_spin_box.setValue(0.0)
+
         self.linear_deflection_spin_box = QtWidgets.QDoubleSpinBox()
         self.linear_deflection_spin_box.setRange(0.01, 2.0)
         self.linear_deflection_spin_box.setDecimals(3)
@@ -120,6 +135,9 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         form_layout.addRow("Depth or height (millimeter):", self.depth_spin_box)
         form_layout.addRow("Legend offset X (millimeter):", self.offset_x_spin_box)
         form_layout.addRow("Legend offset Y (millimeter):", self.offset_y_spin_box)
+        form_layout.addRow("Extrusion vector X (millimeter):", self.extrusion_vector_x_spin_box)
+        form_layout.addRow("Extrusion vector Y (millimeter):", self.extrusion_vector_y_spin_box)
+        form_layout.addRow("Extrusion vector Z (millimeter):", self.extrusion_vector_z_spin_box)
         form_layout.addRow("Mesh linear deflection:", self.linear_deflection_spin_box)
 
         preview_row = QtWidgets.QHBoxLayout()
@@ -204,6 +222,9 @@ class BatchKeycapDialog(QtWidgets.QDialog):
             depth_millimeter=float(self.depth_spin_box.value()),
             offset_x_millimeter=float(self.offset_x_spin_box.value()),
             offset_y_millimeter=float(self.offset_y_spin_box.value()),
+            extrusion_vector_x=float(self.extrusion_vector_x_spin_box.value()),
+            extrusion_vector_y=float(self.extrusion_vector_y_spin_box.value()),
+            extrusion_vector_z=float(self.extrusion_vector_z_spin_box.value()),
             linear_deflection=float(self.linear_deflection_spin_box.value()),
             preview_label=self.preview_label_edit.text().strip() or "A",
         )
