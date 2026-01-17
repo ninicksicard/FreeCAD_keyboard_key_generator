@@ -1,3 +1,4 @@
+import csv
 import os
 from typing import Dict, List
 
@@ -53,6 +54,11 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         self.output_directory_edit = QtWidgets.QLineEdit(os.path.expanduser("~/keycaps_stl_out"))
         self.output_browse_button = QtWidgets.QPushButton("Browse...")
         self.output_browse_button.clicked.connect(self.browse_output_directory)
+
+        self.layout_file_edit = QtWidgets.QLineEdit()
+        self.layout_browse_button = QtWidgets.QPushButton("Browse...")
+        self.layout_browse_button.clicked.connect(self.browse_layout_file)
+        self.layout_primary_labels: List[str] = []
 
         self.mode_selector = QtWidgets.QComboBox()
         self.mode_selector.addItems(["engrave", "raise"])
@@ -114,6 +120,11 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         output_row.addWidget(self.output_directory_edit)
         output_row.addWidget(self.output_browse_button)
         form_layout.addRow("Output folder:", output_row)
+
+        layout_row = QtWidgets.QHBoxLayout()
+        layout_row.addWidget(self.layout_file_edit)
+        layout_row.addWidget(self.layout_browse_button)
+        form_layout.addRow("Layout CSV:", layout_row)
 
         form_layout.addRow("Legend mode:", self.mode_selector)
         form_layout.addRow("Font size (millimeter):", self.size_spin_box)
@@ -184,6 +195,33 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         if path:
             self.output_directory_edit.setText(path)
 
+    def browse_layout_file(self) -> None:
+        start_directory = os.path.dirname(self.layout_file_edit.text().strip()) or os.path.expanduser("~")
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Select layout CSV", start_directory, "CSV files (*.csv)"
+        )
+        if not path:
+            return
+        self.layout_file_edit.setText(path)
+        self.load_layout_primary_labels(path)
+
+    def load_layout_primary_labels(self, filepath: str) -> None:
+        self.layout_primary_labels = []
+        if not os.path.isfile(filepath):
+            return
+        with open(filepath, newline="", encoding="utf-8") as file_handle:
+            reader = csv.DictReader(file_handle)
+            field_names = reader.fieldnames or []
+            if "primary" not in field_names:
+                App.Console.PrintMessage("Layout CSV missing 'primary' column.\n")
+                return
+            for row in reader:
+                label = (row.get("primary") or "").strip()
+                if label:
+                    self.layout_primary_labels.append(label)
+        if self.layout_primary_labels:
+            self.preview_label_edit.setText(self.layout_primary_labels[0])
+
     def get_configuration_for_preview(self) -> ExportConfiguration:
         if len(self.solid_objects) == 0:
             raise RuntimeError("No solid template object available. Use a Body or feature that produces a solid.")
@@ -223,3 +261,6 @@ class BatchKeycapDialog(QtWidgets.QDialog):
 
     def get_configuration(self) -> ExportConfiguration:
         return self.get_configuration_for_preview()
+
+    def get_layout_primary_labels(self) -> List[str]:
+        return list(self.layout_primary_labels)

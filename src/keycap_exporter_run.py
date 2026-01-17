@@ -31,8 +31,12 @@ def generate_keycaps_to_stl_from_selected_template(keys: List[Tuple[str, str]]) 
     App.Console.PrintMessage(f"Font: {export_configuration.font_path}\n")
     App.Console.PrintMessage(f"Output: {export_configuration.output_directory}\n")
 
+    layout_primary_labels = dialog.get_layout_primary_labels()
     for label, safe_name in keys:
-        final_solid = build_keycap_with_legend_shape(document, export_configuration, label=label)
+        key_label = label
+        if layout_primary_labels:
+            key_label = layout_primary_labels.pop(0)
+        final_solid = build_keycap_with_legend_shape(document, export_configuration, label=key_label)
         mesh = shape_to_mesh(final_solid, export_configuration.linear_deflection)
         output_path = os.path.join(export_configuration.output_directory, f"{safe_name}.stl")
         export_stl(mesh, output_path)
