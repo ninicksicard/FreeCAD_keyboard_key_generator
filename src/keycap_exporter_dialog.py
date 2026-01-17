@@ -1,3 +1,4 @@
+import csv
 import os
 from typing import Dict, List
 
@@ -53,6 +54,10 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         self.output_directory_edit = QtWidgets.QLineEdit(os.path.expanduser("~/keycaps_stl_out"))
         self.output_browse_button = QtWidgets.QPushButton("Browse...")
         self.output_browse_button.clicked.connect(self.browse_output_directory)
+
+        self.layout_file_edit = QtWidgets.QLineEdit()
+        self.layout_browse_button = QtWidgets.QPushButton("Browse...")
+        self.layout_browse_button.clicked.connect(self.browse_layout_file)
 
         self.mode_selector = QtWidgets.QComboBox()
         self.mode_selector.addItems(["engrave", "raise"])
@@ -114,6 +119,11 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         output_row.addWidget(self.output_directory_edit)
         output_row.addWidget(self.output_browse_button)
         form_layout.addRow("Output folder:", output_row)
+
+        layout_row = QtWidgets.QHBoxLayout()
+        layout_row.addWidget(self.layout_file_edit)
+        layout_row.addWidget(self.layout_browse_button)
+        form_layout.addRow("Layout file:", layout_row)
 
         form_layout.addRow("Legend mode:", self.mode_selector)
         form_layout.addRow("Font size (millimeter):", self.size_spin_box)
@@ -183,6 +193,27 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         path = QtWidgets.QFileDialog.getExistingDirectory(self, "Select output folder", start_directory)
         if path:
             self.output_directory_edit.setText(path)
+
+    def browse_layout_file(self) -> None:
+        start_directory = os.path.dirname(self.layout_file_edit.text().strip()) or os.path.expanduser("~")
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Select layout file", start_directory, "CSV (*.csv)"
+        )
+        if not path:
+            return
+        self.layout_file_edit.setText(path)
+        self.set_primary_label_from_layout(path)
+
+    def set_primary_label_from_layout(self, layout_file_path: str) -> None:
+        if not os.path.isfile(layout_file_path):
+            return
+        with open(layout_file_path, newline="", encoding="utf-8") as layout_file:
+            reader = csv.DictReader(layout_file)
+            for row in reader:
+                primary_label = (row.get("primary") or "").strip()
+                if primary_label:
+                    self.preview_label_edit.setText(primary_label)
+                    return
 
     def get_configuration_for_preview(self) -> ExportConfiguration:
         if len(self.solid_objects) == 0:
