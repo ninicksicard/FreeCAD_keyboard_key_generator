@@ -179,9 +179,11 @@ def shapestring_shape(document: App.Document, label: str, font_path: str, size_m
     return shape
 
 
-def extrude_to_solid(shape: Part.Shape, height_millimeter: float) -> Part.Shape:
+def extrude_to_solid(shape: Part.Shape, height_millimeter: float, direction: App.Vector) -> Part.Shape:
     if height_millimeter <= 0.0:
         raise ValueError("Legend height or depth must be > 0.")
+    if direction.Length == 0.0:
+        raise ValueError("Extrusion direction must be non-zero.")
 
     if shape.ShapeType == "Wire":
         shape = Part.Face(shape)
@@ -190,7 +192,7 @@ def extrude_to_solid(shape: Part.Shape, height_millimeter: float) -> Part.Shape:
             faces = [Part.Face(wire) for wire in shape.Wires]
             shape = Part.makeCompound(faces)
 
-    return shape.extrude(App.Vector(0.0, 0.0, height_millimeter))
+    return shape.extrude(unit_vector(direction).multiply(height_millimeter))
 
 
 def shape_to_mesh(shape: Part.Shape, linear_deflection: float) -> "Mesh.Mesh":
@@ -237,7 +239,7 @@ def build_keycap_with_legend_shape(
         raise ValueError(f"Unknown face choice: {export_configuration.face_choice_label}")
 
     face = best_face_for_direction(template_shape, direction_world=direction)
-    face_placement, _ = face_plane_placement(face)
+    face_placement, normal_vector = face_plane_placement(face)
 
     legend_shape = shapestring_shape(document, label, export_configuration.font_path, export_configuration.size_millimeter)
 
@@ -251,10 +253,22 @@ def build_keycap_with_legend_shape(
     )
 
     overlap = 0.05
-    legend_shape.translate(App.Vector(0.0, 0.0, -overlap))
+    if export_configuration.mode == "raise":
+        overlap_offset = -overlap
+    elif export_configuration.mode == "engrave":
+        overlap_offset = overlap
+    else:
+        raise ValueError('Legend mode must be "engrave" or "raise".')
+    legend_shape.translate(App.Vector(0.0, 0.0, overlap_offset))
     legend_shape.Placement = face_placement.multiply(legend_shape.Placement)
 
-    legend_solid = extrude_to_solid(legend_shape, export_configuration.depth_millimeter)
+    if export_configuration.mode == "raise":
+        extrusion_direction = normal_vector
+    elif export_configuration.mode == "engrave":
+        extrusion_direction = normal_vector.multiply(-1.0)
+    else:
+        raise ValueError('Legend mode must be "engrave" or "raise".')
+    legend_solid = extrude_to_solid(legend_shape, export_configuration.depth_millimeter, extrusion_direction)
 
     blank_key = template_shape.copy()
 
