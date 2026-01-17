@@ -217,6 +217,15 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         if len(self.solid_objects) == 0:
             raise RuntimeError("No solid template object available. Use a Body or feature that produces a solid.")
 
+        for spin_box in (
+            self.size_spin_box,
+            self.depth_spin_box,
+            self.offset_x_spin_box,
+            self.offset_y_spin_box,
+            self.linear_deflection_spin_box,
+        ):
+            spin_box.interpretText()
+
         template_index = int(self.template_selector.currentIndex())
         template_name = self.template_name_by_index.get(template_index, "")
 
