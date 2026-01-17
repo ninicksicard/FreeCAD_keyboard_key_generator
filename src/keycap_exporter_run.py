@@ -1,6 +1,6 @@
 import csv
 import os
-from typing import List
+from typing import List, Tuple
 
 import FreeCAD as App
 
@@ -8,15 +8,16 @@ from keycap_exporter_core import ExportConfiguration, build_keycap_with_legend_s
 from keycap_exporter_dialog import BatchKeycapDialog
 
 
-def read_primary_labels(layout_file_path: str) -> List[str]:
-    labels: List[str] = []
+def read_layout_entries(layout_file_path: str) -> List[Tuple[str, str]]:
+    entries: List[Tuple[str, str]] = []
     with open(layout_file_path, newline="", encoding="utf-8") as file_handle:
         reader = csv.DictReader(file_handle)
         for row in reader:
-            primary_label = (row.get("primary") or "").strip()
-            if primary_label:
-                labels.append(primary_label)
-    return labels
+            label_text = (row.get("primary") or "").strip()
+            name_text = (row.get("name") or "").strip()
+            if label_text:
+                entries.append((label_text, name_text or label_text))
+    return entries
 
 
 def generate_keycaps_to_stl_from_selected_template() -> None:
@@ -41,8 +42,8 @@ def generate_keycaps_to_stl_from_selected_template() -> None:
     if not export_configuration.layout_file_path or not os.path.isfile(export_configuration.layout_file_path):
         raise FileNotFoundError(f"Layout file not found: {export_configuration.layout_file_path}")
 
-    labels = read_primary_labels(export_configuration.layout_file_path)
-    if len(labels) == 0:
+    entries = read_layout_entries(export_configuration.layout_file_path)
+    if len(entries) == 0:
         raise ValueError("Layout file has no primary labels.")
 
     App.Console.PrintMessage(f"Template: {export_configuration.template_object_name}\n")
@@ -51,10 +52,10 @@ def generate_keycaps_to_stl_from_selected_template() -> None:
     App.Console.PrintMessage(f"Output: {export_configuration.output_directory}\n")
     App.Console.PrintMessage(f"Layout: {export_configuration.layout_file_path}\n")
 
-    for label in labels:
-        final_solid = build_keycap_with_legend_shape(document, export_configuration, label=label)
+    for label_text, name_text in entries:
+        final_solid = build_keycap_with_legend_shape(document, export_configuration, label=label_text)
         mesh = shape_to_mesh(final_solid, export_configuration.linear_deflection)
-        output_path = os.path.join(export_configuration.output_directory, f"{label}.stl")
+        output_path = os.path.join(export_configuration.output_directory, f"{name_text}.stl")
         export_stl(mesh, output_path)
         App.Console.PrintMessage(f"Exported: {output_path}\n")
 
