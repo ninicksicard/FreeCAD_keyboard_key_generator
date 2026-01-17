@@ -46,6 +46,7 @@ FACE_DIRECTIONS: Dict[str, App.Vector] = {
 class ExportConfiguration:
     template_object_name: str
     face_choice_label: str
+    legend_direction_label: str
     font_path: str
     output_directory: str
     mode: str
@@ -149,12 +150,9 @@ def best_face_for_direction(solid_shape: Part.Shape, direction_world: App.Vector
     return best_face
 
 
-def face_plane_placement(face: Part.Face) -> Tuple[App.Placement, App.Vector]:
+def face_plane_placement(face: Part.Face, direction_world: App.Vector) -> App.Placement:
     center = face.CenterOfMass
-    u_middle = 0.5 * (face.ParameterRange[0] + face.ParameterRange[1])
-    v_middle = 0.5 * (face.ParameterRange[2] + face.ParameterRange[3])
-    normal = face.normalAt(u_middle, v_middle)
-    normal_vector = unit_vector(App.Vector(normal.x, normal.y, normal.z))
+    normal_vector = unit_vector(direction_world)
 
     up = App.Vector(0.0, 0.0, 1.0)
     if abs(normal_vector.dot(up)) > 0.95:
@@ -165,7 +163,7 @@ def face_plane_placement(face: Part.Face) -> Tuple[App.Placement, App.Vector]:
 
     rotation = App.Rotation(x_axis, y_axis, normal_vector)
     placement = App.Placement(App.Vector(center.x, center.y, center.z), rotation)
-    return placement, normal_vector
+    return placement
 
 
 def shapestring_shape(document: App.Document, label: str, font_path: str, size_millimeter: float) -> Part.Shape:
@@ -179,10 +177,11 @@ def shapestring_shape(document: App.Document, label: str, font_path: str, size_m
     return shape
 
 
-def extrude_to_solid(shape: Part.Shape, height_millimeter: float) -> Part.Shape:
+def extrude_to_solid(shape: Part.Shape, height_millimeter: float, direction_world: App.Vector) -> Part.Shape:
     if height_millimeter <= 0.0:
         raise ValueError("Legend height or depth must be > 0.")
 
+    direction = unit_vector(direction_world)
     if shape.ShapeType == "Wire":
         shape = Part.Face(shape)
     elif shape.ShapeType == "Compound":
@@ -190,7 +189,7 @@ def extrude_to_solid(shape: Part.Shape, height_millimeter: float) -> Part.Shape:
             faces = [Part.Face(wire) for wire in shape.Wires]
             shape = Part.makeCompound(faces)
 
-    return shape.extrude(App.Vector(0.0, 0.0, height_millimeter))
+    return shape.extrude(direction.multiply(height_millimeter))
 
 
 def shape_to_mesh(shape: Part.Shape, linear_deflection: float) -> "Mesh.Mesh":
@@ -232,12 +231,16 @@ def build_keycap_with_legend_shape(
     if template_shape.isNull() or len(template_shape.Solids) <= 0:
         raise RuntimeError("Template object does not contain a solid. Pick a Body or feature that is the final solid.")
 
-    direction = FACE_DIRECTIONS.get(export_configuration.face_choice_label)
-    if direction is None:
+    face_direction = FACE_DIRECTIONS.get(export_configuration.face_choice_label)
+    if face_direction is None:
         raise ValueError(f"Unknown face choice: {export_configuration.face_choice_label}")
 
-    face = best_face_for_direction(template_shape, direction_world=direction)
-    face_placement, _ = face_plane_placement(face)
+    legend_direction = FACE_DIRECTIONS.get(export_configuration.legend_direction_label)
+    if legend_direction is None:
+        raise ValueError(f"Unknown legend direction: {export_configuration.legend_direction_label}")
+
+    face = best_face_for_direction(template_shape, direction_world=face_direction)
+    face_placement = face_plane_placement(face, direction_world=legend_direction)
 
     legend_shape = shapestring_shape(document, label, export_configuration.font_path, export_configuration.size_millimeter)
 
@@ -251,10 +254,13 @@ def build_keycap_with_legend_shape(
     )
 
     overlap = 0.05
-    legend_shape.translate(App.Vector(0.0, 0.0, -overlap))
+    legend_shape.translate(unit_vector(legend_direction).multiply(-overlap))
     legend_shape.Placement = face_placement.multiply(legend_shape.Placement)
 
-    legend_solid = extrude_to_solid(legend_shape, export_configuration.depth_millimeter)
+    extrude_direction = unit_vector(legend_direction)
+    if export_configuration.mode == "engrave":
+        extrude_direction = extrude_direction.multiply(-1.0)
+    legend_solid = extrude_to_solid(legend_shape, export_configuration.depth_millimeter, extrude_direction)
 
     blank_key = template_shape.copy()
 
