@@ -41,11 +41,17 @@ FACE_DIRECTIONS: Dict[str, App.Vector] = {
     "Left (-X)": App.Vector(-1.0, 0.0, 0.0),
 }
 
+NORMAL_DIRECTIONS: Dict[str, float] = {
+    "Same as legend face": 1.0,
+    "Opposite of legend face": -1.0,
+}
+
 
 @dataclass(frozen=True)
 class ExportConfiguration:
     template_object_name: str
     face_choice_label: str
+    normal_choice_label: str
     font_path: str
     output_directory: str
     mode: str
@@ -149,12 +155,9 @@ def best_face_for_direction(solid_shape: Part.Shape, direction_world: App.Vector
     return best_face
 
 
-def face_plane_placement(face: Part.Face) -> Tuple[App.Placement, App.Vector]:
+def face_plane_placement(face: Part.Face, normal_direction: App.Vector) -> Tuple[App.Placement, App.Vector]:
     center = face.CenterOfMass
-    u_middle = 0.5 * (face.ParameterRange[0] + face.ParameterRange[1])
-    v_middle = 0.5 * (face.ParameterRange[2] + face.ParameterRange[3])
-    normal = face.normalAt(u_middle, v_middle)
-    normal_vector = unit_vector(App.Vector(normal.x, normal.y, normal.z))
+    normal_vector = unit_vector(normal_direction)
 
     up = App.Vector(0.0, 0.0, 1.0)
     if abs(normal_vector.dot(up)) > 0.95:
@@ -236,8 +239,13 @@ def build_keycap_with_legend_shape(
     if direction is None:
         raise ValueError(f"Unknown face choice: {export_configuration.face_choice_label}")
 
+    normal_direction_sign = NORMAL_DIRECTIONS.get(export_configuration.normal_choice_label)
+    if normal_direction_sign is None:
+        raise ValueError(f"Unknown normal choice: {export_configuration.normal_choice_label}")
+
     face = best_face_for_direction(template_shape, direction_world=direction)
-    face_placement, _ = face_plane_placement(face)
+    normal_direction = direction.multiply(normal_direction_sign)
+    face_placement, _ = face_plane_placement(face, normal_direction=normal_direction)
 
     legend_shape = shapestring_shape(document, label, export_configuration.font_path, export_configuration.size_millimeter)
 
