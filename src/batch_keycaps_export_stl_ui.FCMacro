@@ -11,8 +11,7 @@ macro_directory = os.path.dirname(os.path.abspath(__file__))
 if macro_directory not in sys.path:
     sys.path.insert(0, macro_directory)
 
-from keycap_exporter_core import KEYS_TO_EXPORT
 from keycap_exporter_run import generate_keycaps_to_stl_from_selected_template
 
 
-generate_keycaps_to_stl_from_selected_template(KEYS_TO_EXPORT)
+generate_keycaps_to_stl_from_selected_template()
