@@ -53,9 +53,6 @@ class ExportConfiguration:
     depth_millimeter: float
     offset_x_millimeter: float
     offset_y_millimeter: float
-    extrusion_vector_x: float
-    extrusion_vector_y: float
-    extrusion_vector_z: float
     linear_deflection: float
     preview_label: str
 
@@ -182,12 +179,7 @@ def shapestring_shape(document: App.Document, label: str, font_path: str, size_m
     return shape
 
 
-def extrude_to_solid(shape: Part.Shape, height_millimeter: float, extrusion_vector: App.Vector) -> Part.Shape:
-    if extrusion_vector.Length <= 0.0:
-        if height_millimeter <= 0.0:
-            raise ValueError("Legend height or depth must be > 0.")
-        extrusion_vector = App.Vector(0.0, 0.0, height_millimeter)
-
+def extrude_to_solid(shape: Part.Shape, extrusion_vector: App.Vector) -> Part.Shape:
     if shape.ShapeType == "Wire":
         shape = Part.Face(shape)
     elif shape.ShapeType == "Compound":
@@ -241,6 +233,7 @@ def build_keycap_with_legend_shape(
     if direction is None:
         raise ValueError(f"Unknown face choice: {export_configuration.face_choice_label}")
 
+
     face = best_face_for_direction(template_shape, direction_world=direction)
     face_placement, _ = face_plane_placement(face)
 
@@ -255,19 +248,15 @@ def build_keycap_with_legend_shape(
         App.Vector(export_configuration.offset_x_millimeter, export_configuration.offset_y_millimeter, 0.0)
     )
 
-    overlap = 0.00
-    legend_shape.translate(App.Vector(0.0, 0.0, -overlap))
     legend_shape.Placement = face_placement.multiply(legend_shape.Placement)
+    
+    if export_configuration.mode == "raise":
+        extrusion_vector = unit_vector(direction).multiply(export_configuration.depth_millimeter)
 
-    legend_solid = extrude_to_solid(
-        legend_shape,
-        export_configuration.depth_millimeter,
-        App.Vector(
-            export_configuration.extrusion_vector_x,
-            export_configuration.extrusion_vector_y,
-            export_configuration.extrusion_vector_z,
-        ),
-    )
+    if export_configuration.mode == "engrave":
+        extrusion_vector = unit_vector(direction).multiply(-export_configuration.depth_millimeter)
+
+    legend_solid = extrude_to_solid(legend_shape, extrusion_vector)
 
     blank_key = template_shape.copy()
 
