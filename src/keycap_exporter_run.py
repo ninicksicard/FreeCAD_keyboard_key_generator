@@ -1,5 +1,5 @@
 import os
-from typing import List, Tuple
+from typing import Dict, List, Tuple, Union
 
 import FreeCAD as App
 
@@ -7,7 +7,9 @@ from keycap_exporter_core import ExportConfiguration, build_keycap_with_legend_s
 from keycap_exporter_dialog import BatchKeycapDialog
 
 
-def generate_keycaps_to_stl_from_selected_template(keys: List[Tuple[str, str]]) -> None:
+def generate_keycaps_to_stl_from_selected_template(
+    keys: List[Union[Tuple[str, str], Dict[str, str]]]
+) -> None:
     document = App.ActiveDocument
     if document is None:
         raise RuntimeError("No active document. Open your blank key document first.")
@@ -31,10 +33,23 @@ def generate_keycaps_to_stl_from_selected_template(keys: List[Tuple[str, str]]) 
     App.Console.PrintMessage(f"Font: {export_configuration.font_path}\n")
     App.Console.PrintMessage(f"Output: {export_configuration.output_directory}\n")
 
-    for label, safe_name in keys:
+    for key in keys:
+        if isinstance(key, dict):
+            if "label" not in key:
+                raise ValueError("Missing label in key definition.")
+            if "name" not in key:
+                raise ValueError("Missing name in key definition.")
+            label = key["label"].strip()
+            stl_name = key["name"].strip()
+        else:
+            label, stl_name = key
+        if not label:
+            raise ValueError("Label is empty.")
+        if not stl_name:
+            raise ValueError("STL name is empty.")
         final_solid = build_keycap_with_legend_shape(document, export_configuration, label=label)
         mesh = shape_to_mesh(final_solid, export_configuration.linear_deflection)
-        output_path = os.path.join(export_configuration.output_directory, f"{safe_name}.stl")
+        output_path = os.path.join(export_configuration.output_directory, f"{stl_name}.stl")
         export_stl(mesh, output_path)
         App.Console.PrintMessage(f"Exported: {output_path}\n")
 
