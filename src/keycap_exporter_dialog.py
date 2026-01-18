@@ -2,6 +2,7 @@ import csv
 import os
 from typing import Dict, List
 
+from copy import deepcopy
 import FreeCAD as App
 import FreeCADGui as Gui
 from PySide2 import QtWidgets
@@ -18,6 +19,11 @@ from keycap_exporter_core import (
     remove_existing_preview,
     scan_font_files,
     set_preview_shape,
+    resolve_object_by_name,
+    best_face_for_direction,
+    ENGRAVING_DIRECTIONS,
+    FACE_ROTATION,
+    unit_vector,
 )
 
 
@@ -95,7 +101,7 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         self.preview_clear_button.clicked.connect(self.clear_preview_clicked)
 
         self.reload_fonts()
-
+        self.generate_configuration = self.get_configuration_for_preview()
         form_layout = QtWidgets.QFormLayout()
 
         if len(self.solid_objects) == 0:
@@ -230,7 +236,9 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         template_name = self.template_name_by_index.get(template_index, "")
 
         font_index = int(self.font_selector.currentIndex())
+        print(f"{font_index=}")
         font_path = self.font_path_by_index.get(font_index, "")
+        print(f"{font_path=}")
 
         return ExportConfiguration(
             template_object_name=template_name,
@@ -247,13 +255,37 @@ class BatchKeycapDialog(QtWidgets.QDialog):
             preview_label=self.preview_label_edit.text().strip() or "A",
         )
 
+   
+
     def update_preview_clicked(self) -> None:
-        export_configuration = self.get_configuration_for_preview()
+
+
+        generate_configuration = self.get_configuration_for_preview()
+
+        template_object = resolve_object_by_name(App.ActiveDocument, generate_configuration.template_object_name)
+        blank_key = template_object.Shape.copy()
+        direction = FACE_DIRECTIONS[generate_configuration.face_choice_label]
+        center = best_face_for_direction(blank_key, _direction=direction)
+        face_placement = App.Placement(
+            App.Vector(center.x, center.y, center.z),
+            FACE_ROTATION[generate_configuration.face_choice_label],
+            )
+
+        if generate_configuration.mode == "engrave":
+            extrusion_unit_vector = ENGRAVING_DIRECTIONS[generate_configuration.face_choice_label]
+        else:
+            extrusion_unit_vector = FACE_DIRECTIONS[generate_configuration.face_choice_label]
+        extrusion_vector = unit_vector(extrusion_unit_vector).multiply(generate_configuration.depth_millimeter)
+
         preview_shape = build_keycap_with_legend_shape(
             document=self.document,
-            export_configuration=export_configuration,
-            label=export_configuration.preview_label,
+            face_placement=face_placement,
+            extrusion_vector=extrusion_vector,
+            configuration=generate_configuration,
+            blank_key= blank_key,
+            label=generate_configuration.preview_label,
         )
+        
         set_preview_shape(self.document, preview_shape)
         Gui.ActiveDocument.ActiveView.fitAll()
 

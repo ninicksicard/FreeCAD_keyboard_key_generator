@@ -7,7 +7,6 @@ import Draft
 import Mesh
 import Part
 
-
 DEFAULT_FONT_DIRECTORIES: List[str] = [
     "/usr/share/fonts",
     "/usr/local/share/fonts",
@@ -23,6 +22,60 @@ FACE_DIRECTIONS: Dict[str, App.Vector] = {
     "Right (+X)": App.Vector(1.0, 0.0, 0.0),
     "Left (-X)": App.Vector(-1.0, 0.0, 0.0),
 }
+ENGRAVING_DIRECTIONS: Dict[str, App.Vector] = {
+    "Top (+Z)": App.Vector(0.0, 0.0, -1.0),
+    "Bottom (-Z)": App.Vector(0.0, 0.0, 1.0),
+    "Front (+Y)": App.Vector(0.0, -1.0, 0.0),
+    "Back (-Y)": App.Vector(0.0, 1.0, 0.0),
+    "Right (+X)": App.Vector(-1.0, 0.0, 0.0),
+    "Left (-X)": App.Vector(1.0, 0.0, 0.0),
+}
+FACE_ROTATION: Dict[str, App.Rotation] = {
+    # Assumed correct (identity): local axes = global axes
+    # local X -> +X, local Y -> +Y, local Z -> +Z
+    "Top (+Z)": App.Rotation(
+        App.Vector(1.0, 0.0, 0.0),  # X
+        App.Vector(0.0, 1.0, 0.0),  # Y
+        App.Vector(0.0, 0.0, 1.0),  # Z
+    ),
+
+    # local Z -> -Z, keep local X -> +X (right-handed => local Y -> -Y)
+    "Bottom (-Z)": App.Rotation(
+        App.Vector(1.0, 0.0, 0.0),   # X
+        App.Vector(0.0, -1.0, 0.0),  # Y
+        App.Vector(0.0, 0.0, -1.0),  # Z
+    ),
+
+    # local Z -> +Y, choose local Y -> +Z (up on that face) => local X -> -X
+    "Front (+Y)": App.Rotation(
+        App.Vector(-1.0, 0.0, 0.0),  # X
+        App.Vector(0.0, 0.0, 1.0),   # Y
+        App.Vector(0.0, 1.0, 0.0),   # Z
+    ),
+
+    # local Z -> -Y, choose local Y -> +Z (up on that face) => local X -> +X
+    "Back (-Y)": App.Rotation(
+        App.Vector(1.0, 0.0, 0.0),   # X
+        App.Vector(0.0, 0.0, 1.0),   # Y
+        App.Vector(0.0, -1.0, 0.0),  # Z
+    ),
+
+    # local Z -> +X, choose local Y -> +Z (up on that face) => local X -> +Y
+    "Right (+X)": App.Rotation(
+        App.Vector(0.0, 1.0, 0.0),  # X
+        App.Vector(0.0, 0.0, 1.0),  # Y
+        App.Vector(1.0, 0.0, 0.0),  # Z
+    ),
+
+    # local Z -> -X, choose local Y -> +Z (up on that face) => local X -> -Y
+    "Left (-X)": App.Rotation(
+        App.Vector(0.0, -1.0, 0.0),  # X
+        App.Vector(0.0, 0.0, 1.0),   # Y
+        App.Vector(-1.0, 0.0, 0.0),  # Z
+    ),
+}
+
+
 
 
 @dataclass(frozen=True)
@@ -71,6 +124,8 @@ def font_display_name(font_path: str) -> str:
 def list_solid_objects(document: App.Document) -> List[App.DocumentObject]:
     result: List[App.DocumentObject] = []
     for document_object in document.Objects:
+        if getattr(document_object, "Name", "") == "__KEYCAP_PREVIEW__":
+            continue
         shape = getattr(document_object, "Shape", None)
         if shape is None:
             continue
@@ -100,13 +155,12 @@ def resolve_object_by_name(document: App.Document, name: str) -> App.DocumentObj
 def unit_vector(vector: App.Vector) -> App.Vector:
     if vector.Length == 0.0:
         raise ValueError("Zero-length vector.")
-    return vector.multiply(1.0 / vector.Length)
+    return vector.multiply(1.0 / abs(vector.Length))
 
 
-def best_face_for_direction(solid_shape: Part.Shape, direction_world: App.Vector) -> Part.Face:
-    direction = unit_vector(direction_world)
+def best_face_for_direction(solid_shape: Part.Shape, _direction: App.Vector) -> Part.Face:
 
-    best_face: Optional[Part.Face] = None
+    best_center = _direction
     best_score = -1.0
     best_support = -1e100
 
@@ -115,44 +169,23 @@ def best_face_for_direction(solid_shape: Part.Shape, direction_world: App.Vector
         v_middle = 0.5 * (face.ParameterRange[2] + face.ParameterRange[3])
         normal = face.normalAt(u_middle, v_middle)
 
-        normal_vector = unit_vector(App.Vector(normal.x, normal.y, normal.z))
-        score = normal_vector.dot(direction)
+        _normal_vector = unit_vector(App.Vector(normal.x, normal.y, normal.z))
+        score = _normal_vector.dot(_direction)
         if score < best_score:
             continue
 
         center = face.CenterOfMass
-        support = App.Vector(center.x, center.y, center.z).dot(direction)
+        support = App.Vector(center.x, center.y, center.z).dot(_direction)
 
         if (score > best_score + 1e-6) or (abs(score - best_score) <= 1e-6 and support > best_support):
-            best_face = face
             best_score = score
             best_support = support
+            best_center = center
 
-    if best_face is None:
-        raise RuntimeError("Could not determine a suitable face for the selected direction.")
-    return best_face
-
-
-def face_plane_placement(face: Part.Face) -> Tuple[App.Placement, App.Vector]:
-    center = face.CenterOfMass
-    u_middle = 0.5 * (face.ParameterRange[0] + face.ParameterRange[1])
-    v_middle = 0.5 * (face.ParameterRange[2] + face.ParameterRange[3])
-    normal = face.normalAt(u_middle, v_middle)
-    normal_vector = unit_vector(App.Vector(normal.x, normal.y, normal.z))
-
-    up = App.Vector(0.0, 0.0, 1.0)
-    if abs(normal_vector.dot(up)) > 0.95:
-        up = App.Vector(0.0, 1.0, 0.0)
-
-    x_axis = unit_vector(up.cross(normal_vector))
-    y_axis = unit_vector(normal_vector.cross(x_axis))
-
-    rotation = App.Rotation(x_axis, y_axis, normal_vector)
-    placement = App.Placement(App.Vector(center.x, center.y, center.z), rotation)
-    return placement, normal_vector
-
+    return best_center
 
 def shapestring_shape(document: App.Document, label: str, font_path: str, size_millimeter: float) -> Part.Shape:
+    print(font_path)
     shapestring_object = Draft.makeShapeString(String=label, FontFile=font_path, Size=size_millimeter)
     shapestring_object.Label = f"temporary_shapestring_{label}"
     document.recompute()
@@ -204,24 +237,15 @@ def set_preview_shape(document: App.Document, shape: Part.Shape) -> None:
 
 
 def build_keycap_with_legend_shape(
-    document: App.Document,
-    export_configuration: ExportConfiguration,
-    label: str,
+        document: App.Document,
+        face_placement,
+        extrusion_vector,
+        configuration: ExportConfiguration,
+        blank_key,
+        label: str,
 ) -> Part.Shape:
-    template_object = resolve_object_by_name(document, export_configuration.template_object_name)
-    template_shape = template_object.Shape.copy()
-    if template_shape.isNull() or len(template_shape.Solids) <= 0:
-        raise RuntimeError("Template object does not contain a solid. Pick a Body or feature that is the final solid.")
-
-    direction = FACE_DIRECTIONS.get(export_configuration.face_choice_label)
-    if direction is None:
-        raise ValueError(f"Unknown face choice: {export_configuration.face_choice_label}")
-
-
-    face = best_face_for_direction(template_shape, direction_world=direction)
-    face_placement, _ = face_plane_placement(face)
-
-    legend_shape = shapestring_shape(document, label, export_configuration.font_path, export_configuration.size_millimeter)
+    legend_shape = shapestring_shape(document, label, configuration.font_path,
+                                     configuration.size_millimeter)
 
     bounding_box = legend_shape.BoundBox
     legend_center_x = (bounding_box.XMin + bounding_box.XMax) * 0.5
@@ -229,24 +253,19 @@ def build_keycap_with_legend_shape(
 
     legend_shape.translate(App.Vector(-legend_center_x, -legend_center_y, 0.0))
     legend_shape.translate(
-        App.Vector(export_configuration.offset_x_millimeter, export_configuration.offset_y_millimeter, 0.0)
+        App.Vector(configuration.offset_x_millimeter, configuration.offset_y_millimeter, 0.0)
     )
 
     legend_shape.Placement = face_placement.multiply(legend_shape.Placement)
-    
-    if export_configuration.mode == "raise":
-        extrusion_vector = unit_vector(direction).multiply(export_configuration.depth_millimeter)
 
-    if export_configuration.mode == "engrave":
-        extrusion_vector = unit_vector(direction).multiply(-export_configuration.depth_millimeter)
+
 
     legend_solid = extrude_to_solid(legend_shape, extrusion_vector)
 
-    blank_key = template_shape.copy()
 
-    if export_configuration.mode == "raise":
+    if configuration.mode == "raise":
         return blank_key.fuse(legend_solid)
-    if export_configuration.mode == "engrave":
+    if configuration.mode == "engrave":
         return blank_key.cut(legend_solid)
 
     raise ValueError('Legend mode must be "engrave" or "raise".')
