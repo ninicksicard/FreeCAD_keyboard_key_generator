@@ -48,7 +48,7 @@ def generate_keycaps_to_stl_from_selected_template() -> None:
 
     template_object = resolve_object_by_name(document, generate_configuration.template_object_name)
     template_shape = template_object.Shape.copy()
-    for label_text, shift_text, altcr_text, name_text in entries:
+    for label_text, shift_text, altcr_text, function_text, name_text in entries:
         final_solid = build_keycap_shape_from_configuration(
             document,
             template_shape,
@@ -56,6 +56,7 @@ def generate_keycaps_to_stl_from_selected_template() -> None:
             label_text,
             shift_text or None,
             altcr_text or None,
+            function_text or None,
         )
         mesh = shape_to_mesh(final_solid, generate_configuration.linear_deflection)
         output_path = os.path.join(generate_configuration.output_directory, f"{name_text}.stl")
