@@ -1,34 +1,16 @@
-import csv
 import os
-from typing import List, Tuple
 
 from copy import deepcopy
 import FreeCAD as App
 
 from keycap_exporter_core import (
-    FACE_ROTATION,
     ExportConfiguration,
-    build_keycap_with_legend_shape,
+    build_keycap_shape_for_label,
+    build_legend_label,
     export_stl, shape_to_mesh,
-    resolve_object_by_name,
-    FACE_DIRECTIONS,
-    best_face_for_direction,
-    ENGRAVING_DIRECTIONS,
-    unit_vector,
+    read_layout_entries,
 )
 from keycap_exporter_dialog import BatchKeycapDialog
-
-
-def read_layout_entries(layout_file_path: str) -> List[Tuple[str, str]]:
-    entries: List[Tuple[str, str]] = []
-    with open(layout_file_path, newline="", encoding="utf-8") as file_handle:
-        reader = csv.DictReader(file_handle)
-        for row in reader:
-            label_text = (row.get("primary") or "").strip()
-            name_text = (row.get("name") or "").strip()
-            if label_text:
-                entries.append((label_text, name_text or label_text))
-    return entries
 
 
 def generate_keycaps_to_stl_from_selected_template() -> None:
@@ -65,29 +47,13 @@ def generate_keycaps_to_stl_from_selected_template() -> None:
 
     generate_configuration = deepcopy(export_configuration)
 
-    template_object = resolve_object_by_name(document, generate_configuration.template_object_name)
-    template_shape = template_object.Shape.copy()
-    direction = FACE_DIRECTIONS[generate_configuration.face_choice_label]
-    center = best_face_for_direction(template_shape, _direction=direction)
-    face_placement = App.Placement(
-        App.Vector(center.x, center.y, center.z),
-        FACE_ROTATION[generate_configuration.face_choice_label],
-        )
-
-    if generate_configuration.mode == "engrave":
-        extrusion_unit_vector = ENGRAVING_DIRECTIONS[generate_configuration.face_choice_label]
-    else:
-        extrusion_unit_vector = FACE_DIRECTIONS[generate_configuration.face_choice_label]
-    extrusion_vector = unit_vector(extrusion_unit_vector).multiply(generate_configuration.depth_millimeter)
-    for label_text, name_text in entries:
-        final_solid = build_keycap_with_legend_shape(
+    for label_text, name_text, shift_text in entries:
+        legend_label = build_legend_label(label_text, shift_text)
+        final_solid = build_keycap_shape_for_label(
             document=document,
-            face_placement=face_placement,
-            extrusion_vector=extrusion_vector,
             configuration=generate_configuration,
-            blank_key=template_shape,
-            label=label_text
-            )
+            label=legend_label,
+        )
         mesh = shape_to_mesh(final_solid, generate_configuration.linear_deflection)
         output_path = os.path.join(generate_configuration.output_directory, f"{name_text}.stl")
         export_stl(mesh, output_path)
