@@ -13,5 +13,4 @@ if macro_directory not in sys.path:
 
 from keycap_exporter_run import generate_keycaps_to_stl_from_selected_template
 
-
 generate_keycaps_to_stl_from_selected_template()
