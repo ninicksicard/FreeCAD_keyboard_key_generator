@@ -86,10 +86,13 @@ class ExportConfiguration:
     output_directory: str
     layout_file_path: str
     mode: str
-    size_millimeter: float
+    primary_size_millimeter: float
     depth_millimeter: float
-    offset_x_millimeter: float
-    offset_y_millimeter: float
+    primary_offset_x_millimeter: float
+    primary_offset_y_millimeter: float
+    shift_size_millimeter: float
+    shift_offset_x_millimeter: float
+    shift_offset_y_millimeter: float
     linear_deflection: float
     preview_label: str
 
@@ -242,26 +245,39 @@ def build_keycap_with_legend_shape(
         extrusion_vector,
         configuration: ExportConfiguration,
         blank_key,
-        label: str,
+        primary_label: str,
+        shift_label: str,
 ) -> Part.Shape:
-    legend_shape = shapestring_shape(document, label, configuration.font_path,
-                                     configuration.size_millimeter)
+    def build_legend_solid(label: str, size_millimeter: float, offset_x: float, offset_y: float) -> Part.Shape:
+        legend_shape = shapestring_shape(document, label, configuration.font_path, size_millimeter)
+        bounding_box = legend_shape.BoundBox
+        legend_center_x = (bounding_box.XMin + bounding_box.XMax) * 0.5
+        legend_center_y = (bounding_box.YMin + bounding_box.YMax) * 0.5
+        legend_shape.translate(App.Vector(-legend_center_x, -legend_center_y, 0.0))
+        legend_shape.translate(App.Vector(offset_x, offset_y, 0.0))
+        legend_shape.Placement = face_placement.multiply(legend_shape.Placement)
+        return extrude_to_solid(legend_shape, extrusion_vector)
 
-    bounding_box = legend_shape.BoundBox
-    legend_center_x = (bounding_box.XMin + bounding_box.XMax) * 0.5
-    legend_center_y = (bounding_box.YMin + bounding_box.YMax) * 0.5
+    has_shift_label = bool(shift_label)
+    primary_offset_x = configuration.primary_offset_x_millimeter if has_shift_label else 0.0
+    primary_offset_y = configuration.primary_offset_y_millimeter if has_shift_label else 0.0
 
-    legend_shape.translate(App.Vector(-legend_center_x, -legend_center_y, 0.0))
-    legend_shape.translate(
-        App.Vector(configuration.offset_x_millimeter, configuration.offset_y_millimeter, 0.0)
-    )
+    legend_solids = [
+        build_legend_solid(primary_label, configuration.primary_size_millimeter, primary_offset_x, primary_offset_y)
+    ]
+    if has_shift_label:
+        legend_solids.append(
+            build_legend_solid(
+                shift_label,
+                configuration.shift_size_millimeter,
+                configuration.shift_offset_x_millimeter,
+                configuration.shift_offset_y_millimeter,
+            )
+        )
 
-    legend_shape.Placement = face_placement.multiply(legend_shape.Placement)
-
-
-
-    legend_solid = extrude_to_solid(legend_shape, extrusion_vector)
-
+    legend_solid = legend_solids[0]
+    for solid in legend_solids[1:]:
+        legend_solid = legend_solid.fuse(solid)
 
     if configuration.mode == "raise":
         return blank_key.fuse(legend_solid)

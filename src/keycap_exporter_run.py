@@ -19,15 +19,16 @@ from keycap_exporter_core import (
 from keycap_exporter_dialog import BatchKeycapDialog
 
 
-def read_layout_entries(layout_file_path: str) -> List[Tuple[str, str]]:
-    entries: List[Tuple[str, str]] = []
+def read_layout_entries(layout_file_path: str) -> List[Tuple[str, str, str]]:
+    entries: List[Tuple[str, str, str]] = []
     with open(layout_file_path, newline="", encoding="utf-8") as file_handle:
         reader = csv.DictReader(file_handle)
         for row in reader:
             label_text = (row.get("primary") or "").strip()
             name_text = (row.get("name") or "").strip()
+            shift_text = (row.get("shift") or "").strip()
             if label_text:
-                entries.append((label_text, name_text or label_text))
+                entries.append((label_text, name_text or label_text, shift_text))
     return entries
 
 
@@ -79,14 +80,15 @@ def generate_keycaps_to_stl_from_selected_template() -> None:
     else:
         extrusion_unit_vector = FACE_DIRECTIONS[generate_configuration.face_choice_label]
     extrusion_vector = unit_vector(extrusion_unit_vector).multiply(generate_configuration.depth_millimeter)
-    for label_text, name_text in entries:
+    for label_text, name_text, shift_text in entries:
         final_solid = build_keycap_with_legend_shape(
             document=document,
             face_placement=face_placement,
             extrusion_vector=extrusion_vector,
             configuration=generate_configuration,
             blank_key=template_shape,
-            label=label_text
+            primary_label=label_text,
+            shift_label=shift_text,
             )
         mesh = shape_to_mesh(final_solid, generate_configuration.linear_deflection)
         output_path = os.path.join(generate_configuration.output_directory, f"{name_text}.stl")
