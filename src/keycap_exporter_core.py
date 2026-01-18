@@ -1,3 +1,4 @@
+import csv
 import os
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
@@ -124,6 +125,19 @@ def font_display_name(font_path: str) -> str:
     return os.path.basename(font_path)
 
 
+def read_layout_entries(layout_file_path: str) -> List[Tuple[str, str, str]]:
+    entries: List[Tuple[str, str, str]] = []
+    with open(layout_file_path, newline="", encoding="utf-8") as file_handle:
+        reader = csv.DictReader(file_handle)
+        for row in reader:
+            label_text = (row.get("primary") or "").strip()
+            shift_text = (row.get("shift") or "").strip()
+            name_text = (row.get("name") or "").strip()
+            if label_text:
+                entries.append((label_text, shift_text, name_text or label_text))
+    return entries
+
+
 def list_solid_objects(document: App.Document) -> List[App.DocumentObject]:
     result: List[App.DocumentObject] = []
     for document_object in document.Objects:
@@ -188,7 +202,6 @@ def best_face_for_direction(solid_shape: Part.Shape, _direction: App.Vector) -> 
     return best_center
 
 def shapestring_shape(document: App.Document, label: str, font_path: str, size_millimeter: float) -> Part.Shape:
-    print(font_path)
     shapestring_object = Draft.makeShapeString(String=label, FontFile=font_path, Size=size_millimeter)
     shapestring_object.Label = f"temporary_shapestring_{label}"
     document.recompute()
@@ -301,3 +314,34 @@ def build_keycap_with_legend_shape(
         return blank_key.cut(legend_solid)
 
     raise ValueError('Legend mode must be "engrave" or "raise".')
+
+
+def build_keycap_shape_from_configuration(
+    document: App.Document,
+    template_shape: Part.Shape,
+    configuration: ExportConfiguration,
+    label: str,
+    shift_label: Optional[str] = None,
+) -> Part.Shape:
+    direction = FACE_DIRECTIONS[configuration.face_choice_label]
+    center = best_face_for_direction(template_shape, _direction=direction)
+    face_placement = App.Placement(
+        App.Vector(center.x, center.y, center.z),
+        FACE_ROTATION[configuration.face_choice_label],
+    )
+
+    if configuration.mode == "engrave":
+        extrusion_unit_vector = ENGRAVING_DIRECTIONS[configuration.face_choice_label]
+    else:
+        extrusion_unit_vector = FACE_DIRECTIONS[configuration.face_choice_label]
+    extrusion_vector = unit_vector(extrusion_unit_vector).multiply(configuration.depth_millimeter)
+
+    return build_keycap_with_legend_shape(
+        document=document,
+        face_placement=face_placement,
+        extrusion_vector=extrusion_vector,
+        configuration=configuration,
+        blank_key=template_shape,
+        label=label,
+        shift_label=shift_label,
+    )

@@ -11,19 +11,16 @@ from keycap_exporter_core import (
     DEFAULT_FONT_DIRECTORIES,
     FACE_DIRECTIONS,
     ExportConfiguration,
-    build_keycap_with_legend_shape,
+    build_keycap_shape_from_configuration,
     font_display_name,
     is_variable_font_filename,
     list_solid_objects,
     object_display_name,
     remove_existing_preview,
+    read_layout_entries,
     scan_font_files,
     set_preview_shape,
     resolve_object_by_name,
-    best_face_for_direction,
-    ENGRAVING_DIRECTIONS,
-    FACE_ROTATION,
-    unit_vector,
 )
 
 
@@ -257,9 +254,7 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         template_name = self.template_name_by_index.get(template_index, "")
 
         font_index = int(self.font_selector.currentIndex())
-        print(f"{font_index=}")
         font_path = self.font_path_by_index.get(font_index, "")
-        print(f"{font_path=}")
 
         return ExportConfiguration(
             template_object_name=template_name,
@@ -282,34 +277,27 @@ class BatchKeycapDialog(QtWidgets.QDialog):
    
 
     def update_preview_clicked(self) -> None:
-
-
         generate_configuration = self.get_configuration_for_preview()
 
         template_object = resolve_object_by_name(App.ActiveDocument, generate_configuration.template_object_name)
         blank_key = template_object.Shape.copy()
-        direction = FACE_DIRECTIONS[generate_configuration.face_choice_label]
-        center = best_face_for_direction(blank_key, _direction=direction)
-        face_placement = App.Placement(
-            App.Vector(center.x, center.y, center.z),
-            FACE_ROTATION[generate_configuration.face_choice_label],
-            )
 
-        if generate_configuration.mode == "engrave":
-            extrusion_unit_vector = ENGRAVING_DIRECTIONS[generate_configuration.face_choice_label]
-        else:
-            extrusion_unit_vector = FACE_DIRECTIONS[generate_configuration.face_choice_label]
-        extrusion_vector = unit_vector(extrusion_unit_vector).multiply(generate_configuration.depth_millimeter)
+        preview_label = generate_configuration.preview_label
+        shift_label = None
+        layout_file_path = generate_configuration.layout_file_path
+        if layout_file_path and os.path.isfile(layout_file_path):
+            entries = read_layout_entries(layout_file_path)
+            if entries:
+                preview_label, shift_label, _ = entries[0]
 
-        preview_shape = build_keycap_with_legend_shape(
-            document=self.document,
-            face_placement=face_placement,
-            extrusion_vector=extrusion_vector,
-            configuration=generate_configuration,
-            blank_key= blank_key,
-            label=generate_configuration.preview_label,
+        preview_shape = build_keycap_shape_from_configuration(
+            self.document,
+            blank_key,
+            generate_configuration,
+            preview_label,
+            shift_label,
         )
-        
+
         set_preview_shape(self.document, preview_shape)
         Gui.ActiveDocument.ActiveView.fitAll()
 
