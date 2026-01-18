@@ -68,25 +68,40 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         self.mode_selector = QtWidgets.QComboBox()
         self.mode_selector.addItems(["engrave", "raise"])
 
-        self.size_spin_box = QtWidgets.QDoubleSpinBox()
-        self.size_spin_box.setRange(1.0, 50.0)
-        self.size_spin_box.setDecimals(2)
-        self.size_spin_box.setValue(6.0)
+        self.primary_size_spin_box = QtWidgets.QDoubleSpinBox()
+        self.primary_size_spin_box.setRange(1.0, 50.0)
+        self.primary_size_spin_box.setDecimals(2)
+        self.primary_size_spin_box.setValue(6.0)
+
+        self.primary_offset_x_spin_box = QtWidgets.QDoubleSpinBox()
+        self.primary_offset_x_spin_box.setRange(-50.0, 50.0)
+        self.primary_offset_x_spin_box.setDecimals(2)
+        self.primary_offset_x_spin_box.setValue(-1.5)
+
+        self.primary_offset_y_spin_box = QtWidgets.QDoubleSpinBox()
+        self.primary_offset_y_spin_box.setRange(-50.0, 50.0)
+        self.primary_offset_y_spin_box.setDecimals(2)
+        self.primary_offset_y_spin_box.setValue(0.0)
+
+        self.shift_size_spin_box = QtWidgets.QDoubleSpinBox()
+        self.shift_size_spin_box.setRange(1.0, 50.0)
+        self.shift_size_spin_box.setDecimals(2)
+        self.shift_size_spin_box.setValue(4.0)
+
+        self.shift_offset_x_spin_box = QtWidgets.QDoubleSpinBox()
+        self.shift_offset_x_spin_box.setRange(-50.0, 50.0)
+        self.shift_offset_x_spin_box.setDecimals(2)
+        self.shift_offset_x_spin_box.setValue(1.5)
+
+        self.shift_offset_y_spin_box = QtWidgets.QDoubleSpinBox()
+        self.shift_offset_y_spin_box.setRange(-50.0, 50.0)
+        self.shift_offset_y_spin_box.setDecimals(2)
+        self.shift_offset_y_spin_box.setValue(1.5)
 
         self.depth_spin_box = QtWidgets.QDoubleSpinBox()
         self.depth_spin_box.setRange(0.05, 10.0)
         self.depth_spin_box.setDecimals(2)
         self.depth_spin_box.setValue(0.6)
-
-        self.offset_x_spin_box = QtWidgets.QDoubleSpinBox()
-        self.offset_x_spin_box.setRange(-50.0, 50.0)
-        self.offset_x_spin_box.setDecimals(2)
-        self.offset_x_spin_box.setValue(0.0)
-
-        self.offset_y_spin_box = QtWidgets.QDoubleSpinBox()
-        self.offset_y_spin_box.setRange(-50.0, 50.0)
-        self.offset_y_spin_box.setDecimals(2)
-        self.offset_y_spin_box.setValue(0.0)
 
         self.linear_deflection_spin_box = QtWidgets.QDoubleSpinBox()
         self.linear_deflection_spin_box.setRange(0.01, 2.0)
@@ -132,10 +147,13 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         form_layout.addRow("Layout file:", layout_row)
 
         form_layout.addRow("Legend mode:", self.mode_selector)
-        form_layout.addRow("Font size (millimeter):", self.size_spin_box)
+        form_layout.addRow("Primary font size (millimeter):", self.primary_size_spin_box)
+        form_layout.addRow("Primary offset X (millimeter):", self.primary_offset_x_spin_box)
+        form_layout.addRow("Primary offset Y (millimeter):", self.primary_offset_y_spin_box)
+        form_layout.addRow("Shift font size (millimeter):", self.shift_size_spin_box)
+        form_layout.addRow("Shift offset X (millimeter):", self.shift_offset_x_spin_box)
+        form_layout.addRow("Shift offset Y (millimeter):", self.shift_offset_y_spin_box)
         form_layout.addRow("Depth or height (millimeter):", self.depth_spin_box)
-        form_layout.addRow("Legend offset X (millimeter):", self.offset_x_spin_box)
-        form_layout.addRow("Legend offset Y (millimeter):", self.offset_y_spin_box)
         form_layout.addRow("Mesh linear deflection:", self.linear_deflection_spin_box)
 
         preview_row = QtWidgets.QHBoxLayout()
@@ -224,10 +242,13 @@ class BatchKeycapDialog(QtWidgets.QDialog):
             raise RuntimeError("No solid template object available. Use a Body or feature that produces a solid.")
 
         for spin_box in (
-            self.size_spin_box,
+            self.primary_size_spin_box,
             self.depth_spin_box,
-            self.offset_x_spin_box,
-            self.offset_y_spin_box,
+            self.primary_offset_x_spin_box,
+            self.primary_offset_y_spin_box,
+            self.shift_size_spin_box,
+            self.shift_offset_x_spin_box,
+            self.shift_offset_y_spin_box,
             self.linear_deflection_spin_box,
         ):
             spin_box.interpretText()
@@ -247,10 +268,13 @@ class BatchKeycapDialog(QtWidgets.QDialog):
             output_directory=self.output_directory_edit.text().strip(),
             layout_file_path=self.layout_file_edit.text().strip(),
             mode=self.mode_selector.currentText().strip().lower(),
-            size_millimeter=float(self.size_spin_box.value()),
+            primary_size_millimeter=float(self.primary_size_spin_box.value()),
+            primary_offset_x_millimeter=float(self.primary_offset_x_spin_box.value()),
+            primary_offset_y_millimeter=float(self.primary_offset_y_spin_box.value()),
+            shift_size_millimeter=float(self.shift_size_spin_box.value()),
+            shift_offset_x_millimeter=float(self.shift_offset_x_spin_box.value()),
+            shift_offset_y_millimeter=float(self.shift_offset_y_spin_box.value()),
             depth_millimeter=float(self.depth_spin_box.value()),
-            offset_x_millimeter=float(self.offset_x_spin_box.value()),
-            offset_y_millimeter=float(self.offset_y_spin_box.value()),
             linear_deflection=float(self.linear_deflection_spin_box.value()),
             preview_label=self.preview_label_edit.text().strip() or "A",
         )
@@ -284,6 +308,7 @@ class BatchKeycapDialog(QtWidgets.QDialog):
             configuration=generate_configuration,
             blank_key= blank_key,
             label=generate_configuration.preview_label,
+            shift_label="",
         )
         
         set_preview_shape(self.document, preview_shape)
