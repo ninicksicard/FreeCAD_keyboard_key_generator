@@ -1,5 +1,9 @@
 import os
 from copy import deepcopy
+
+import sys
+sys.path.append('/usr/lib/python3.14/site-packages') 
+sys.path.append('/usr/lib64/python3.14/site-packages') 
 import FreeCAD as App
 
 from keycap_exporter_core import (

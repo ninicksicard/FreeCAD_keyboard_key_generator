@@ -1,10 +1,20 @@
+"""
+File: keycap_exporter_dialog.py
+
+Batch keycap STL export dialog for FreeCAD.
+
+Theme files are stored using jsonpickle to minimize boilerplate:
+we encode/decode a single configuration wrapper instance at once.
+"""
+
 import csv
-import json
 import os
+from dataclasses import dataclass
 from typing import Dict, List
 
 import FreeCAD as App
 import FreeCADGui as Gui
+import jsonpickle
 from PySide2 import QtWidgets
 
 from keycap_exporter_core import (
@@ -22,6 +32,21 @@ from keycap_exporter_core import (
     set_preview_shape,
     resolve_object_by_name,
 )
+
+
+@dataclass
+class ThemeConfiguration:
+    """
+    File: keycap_exporter_dialog.py
+
+    Theme wrapper persisted via jsonpickle.
+
+    This is intentionally a single object so theme save/load is just:
+    - encode one instance
+    - decode one instance
+    """
+    export_configuration: ExportConfiguration
+    include_variable_fonts: bool = False
 
 
 class BatchKeycapDialog(QtWidgets.QDialog):
@@ -230,7 +255,6 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         self.setLayout(layout)
 
         self.resize(820, 0)
-        self.theme_extra_values: Dict[str, object] = {}
 
     def reload_fonts(self) -> None:
         include_variable = bool(self.include_variable_fonts_checkbox.isChecked())
@@ -304,13 +328,20 @@ class BatchKeycapDialog(QtWidgets.QDialog):
             return
 
         with open(path, encoding="utf-8") as file_handle:
-            theme_data = json.load(file_handle)
-        theme_values = theme_data.get("values", theme_data)
-        if not isinstance(theme_values, dict):
-            raise ValueError("Theme file has no values dictionary.")
+            raw_text = file_handle.read()
 
-        self.apply_theme_values(theme_values)
-        self.theme_file_edit.setText(path)
+        decoded_object = None
+        decode_error: Exception | None = None
+        try:
+            decoded_object = jsonpickle.decode(raw_text)
+        except Exception as exception:
+            decode_error = exception
+
+        if isinstance(decoded_object, ThemeConfiguration):
+            self.apply_theme_configuration(decoded_object)
+            self.theme_file_edit.setText(path)
+        
+
 
     def save_theme(self) -> None:
         start_directory = self.theme_file_edit.text().strip() or os.path.expanduser("~")
@@ -320,157 +351,102 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         if not path:
             return
 
-        theme_values = self.collect_theme_values()
-        theme_data = {
-            "format": "keycap-exporter-theme",
-            "version": 1,
-            "values": theme_values,
-        }
+        theme_configuration = self.collect_theme_configuration()
+
+        serialized = jsonpickle.encode(
+            theme_configuration,
+            unpicklable=True,
+            indent=2,
+            make_refs=False,
+        )
         with open(path, "w", encoding="utf-8") as file_handle:
-            json.dump(theme_data, file_handle, indent=2, ensure_ascii=False)
+            file_handle.write(serialized)
+
         self.theme_file_edit.setText(path)
 
-    def apply_theme_values(self, theme_values: Dict[str, object]) -> None:
-        known_keys = {
-            "template_object_name",
-            "face_choice_label",
-            "font_path",
-            "output_directory",
-            "layout_file_path",
-            "mode",
-            "primary_font_size_millimeter",
-            "primary_offset_x_millimeter",
-            "primary_offset_y_millimeter",
-            "shift_font_size_millimeter",
-            "shift_offset_x_millimeter",
-            "shift_offset_y_millimeter",
-            "altcr_font_size_millimeter",
-            "altcr_offset_x_millimeter",
-            "altcr_offset_y_millimeter",
-            "function_font_size_millimeter",
-            "function_offset_x_millimeter",
-            "function_offset_y_millimeter",
-            "depth_millimeter",
-            "linear_deflection",
-            "preview_label",
-            "include_variable_fonts",
-            "enable_shift_legend",
-            "enable_alternate_graphic_legend",
-            "enable_function_legend",
-        }
-        self.theme_extra_values = {key: value for key, value in theme_values.items() if key not in known_keys}
-
-        include_variable_fonts = bool(theme_values.get("include_variable_fonts", False))
-        self.include_variable_fonts_checkbox.setChecked(include_variable_fonts)
+    def apply_theme_configuration(self, theme_configuration: ThemeConfiguration) -> None:
+        self.include_variable_fonts_checkbox.setChecked(bool(theme_configuration.include_variable_fonts))
         self.reload_fonts()
 
-        template_object_name = str(theme_values.get("template_object_name", "") or "")
+        export_configuration = theme_configuration.export_configuration
+
+        template_object_name = str(getattr(export_configuration, "template_object_name", "") or "")
         if template_object_name:
             for index, name in self.template_name_by_index.items():
                 if name == template_object_name:
                     self.template_selector.setCurrentIndex(index)
                     break
 
-        face_choice_label = str(theme_values.get("face_choice_label", "") or "")
+        face_choice_label = str(getattr(export_configuration, "face_choice_label", "") or "")
         if face_choice_label:
             for index in range(self.face_selector.count()):
                 if self.face_selector.itemText(index) == face_choice_label:
                     self.face_selector.setCurrentIndex(index)
                     break
 
-        font_path = str(theme_values.get("font_path", "") or "")
+        font_path = str(getattr(export_configuration, "font_path", "") or "")
         if font_path:
             if font_path not in self.font_paths:
                 self.font_paths.append(font_path)
                 self.font_paths = sorted(set(self.font_paths), key=lambda path: path.lower())
                 self.font_selector.clear()
                 self.font_path_by_index.clear()
-                for index, path in enumerate(self.font_paths):
-                    self.font_selector.addItem(font_display_name(path))
-                    self.font_path_by_index[index] = path
+                for index, font_path_item in enumerate(self.font_paths):
+                    self.font_selector.addItem(font_display_name(font_path_item))
+                    self.font_path_by_index[index] = font_path_item
             for index in range(self.font_selector.count()):
                 if self.font_path_by_index.get(index) == font_path:
                     self.font_selector.setCurrentIndex(index)
                     break
 
-        output_directory = str(theme_values.get("output_directory", "") or "")
+        output_directory = str(getattr(export_configuration, "output_directory", "") or "")
         if output_directory:
             self.output_directory_edit.setText(output_directory)
 
-        layout_file_path = str(theme_values.get("layout_file_path", "") or "")
+        layout_file_path = str(getattr(export_configuration, "layout_file_path", "") or "")
         if layout_file_path:
             self.layout_file_edit.setText(layout_file_path)
 
-        mode = str(theme_values.get("mode", "") or "")
+        mode = str(getattr(export_configuration, "mode", "") or "")
         if mode:
             for index in range(self.mode_selector.count()):
                 if self.mode_selector.itemText(index) == mode:
                     self.mode_selector.setCurrentIndex(index)
                     break
 
-        self.primary_font_size_spin_box.setValue(float(theme_values.get("primary_font_size_millimeter", 6.0)))
-        self.shift_font_size_spin_box.setValue(float(theme_values.get("shift_font_size_millimeter", 4.0)))
-        self.altcr_font_size_spin_box.setValue(float(theme_values.get("altcr_font_size_millimeter", 4.0)))
-        self.function_font_size_spin_box.setValue(float(theme_values.get("function_font_size_millimeter", 4.0)))
-        self.depth_spin_box.setValue(float(theme_values.get("depth_millimeter", 0.6)))
-        self.primary_offset_x_spin_box.setValue(float(theme_values.get("primary_offset_x_millimeter", -2.0)))
-        self.primary_offset_y_spin_box.setValue(float(theme_values.get("primary_offset_y_millimeter", 0.0)))
-        self.shift_offset_x_spin_box.setValue(float(theme_values.get("shift_offset_x_millimeter", 2.0)))
-        self.shift_offset_y_spin_box.setValue(float(theme_values.get("shift_offset_y_millimeter", 2.0)))
-        self.altcr_offset_x_spin_box.setValue(float(theme_values.get("altcr_offset_x_millimeter", 2.0)))
-        self.altcr_offset_y_spin_box.setValue(float(theme_values.get("altcr_offset_y_millimeter", -2.0)))
-        self.function_offset_x_spin_box.setValue(float(theme_values.get("function_offset_x_millimeter", 0.0)))
-        self.function_offset_y_spin_box.setValue(float(theme_values.get("function_offset_y_millimeter", -2.0)))
-        self.linear_deflection_spin_box.setValue(float(theme_values.get("linear_deflection", 0.08)))
+        self.primary_font_size_spin_box.setValue(float(getattr(export_configuration, "primary_font_size_millimeter", 6.0)))
+        self.shift_font_size_spin_box.setValue(float(getattr(export_configuration, "shift_font_size_millimeter", 4.0)))
+        self.altcr_font_size_spin_box.setValue(float(getattr(export_configuration, "altcr_font_size_millimeter", 4.0)))
+        self.function_font_size_spin_box.setValue(float(getattr(export_configuration, "function_font_size_millimeter", 4.0)))
+        self.depth_spin_box.setValue(float(getattr(export_configuration, "depth_millimeter", 0.6)))
+        self.primary_offset_x_spin_box.setValue(float(getattr(export_configuration, "primary_offset_x_millimeter", -2.0)))
+        self.primary_offset_y_spin_box.setValue(float(getattr(export_configuration, "primary_offset_y_millimeter", 0.0)))
+        self.shift_offset_x_spin_box.setValue(float(getattr(export_configuration, "shift_offset_x_millimeter", 2.0)))
+        self.shift_offset_y_spin_box.setValue(float(getattr(export_configuration, "shift_offset_y_millimeter", 2.0)))
+        self.altcr_offset_x_spin_box.setValue(float(getattr(export_configuration, "altcr_offset_x_millimeter", 2.0)))
+        self.altcr_offset_y_spin_box.setValue(float(getattr(export_configuration, "altcr_offset_y_millimeter", -2.0)))
+        self.function_offset_x_spin_box.setValue(float(getattr(export_configuration, "function_offset_x_millimeter", 0.0)))
+        self.function_offset_y_spin_box.setValue(float(getattr(export_configuration, "function_offset_y_millimeter", -2.0)))
+        self.linear_deflection_spin_box.setValue(float(getattr(export_configuration, "linear_deflection", 0.08)))
 
-        preview_label = str(theme_values.get("preview_label", "") or "")
+        preview_label = str(getattr(export_configuration, "preview_label", "") or "")
         if preview_label:
             self.preview_label_edit.setText(preview_label)
 
-        self.shift_enabled_checkbox.setChecked(bool(theme_values.get("enable_shift_legend", True)))
+        self.shift_enabled_checkbox.setChecked(bool(getattr(export_configuration, "enable_shift_legend", True)))
         self.alternate_graphic_enabled_checkbox.setChecked(
-            bool(theme_values.get("enable_alternate_graphic_legend", True))
+            bool(getattr(export_configuration, "enable_alternate_graphic_legend", True))
         )
-        self.function_enabled_checkbox.setChecked(bool(theme_values.get("enable_function_legend", True)))
+        self.function_enabled_checkbox.setChecked(bool(getattr(export_configuration, "enable_function_legend", True)))
 
-    def collect_theme_values(self) -> Dict[str, object]:
-        template_index = int(self.template_selector.currentIndex())
-        template_name = self.template_name_by_index.get(template_index, "")
-
-        font_index = int(self.font_selector.currentIndex())
-        font_path = self.font_path_by_index.get(font_index, "")
-
-        values = dict(self.theme_extra_values)
-        values.update(
-            {
-                "template_object_name": template_name,
-                "face_choice_label": self.face_selector.currentText().strip(),
-                "font_path": font_path,
-                "output_directory": self.output_directory_edit.text().strip(),
-                "layout_file_path": self.layout_file_edit.text().strip(),
-                "mode": self.mode_selector.currentText().strip().lower(),
-                "primary_font_size_millimeter": float(self.primary_font_size_spin_box.value()),
-                "primary_offset_x_millimeter": float(self.primary_offset_x_spin_box.value()),
-                "primary_offset_y_millimeter": float(self.primary_offset_y_spin_box.value()),
-                "shift_font_size_millimeter": float(self.shift_font_size_spin_box.value()),
-                "shift_offset_x_millimeter": float(self.shift_offset_x_spin_box.value()),
-                "shift_offset_y_millimeter": float(self.shift_offset_y_spin_box.value()),
-                "altcr_font_size_millimeter": float(self.altcr_font_size_spin_box.value()),
-                "altcr_offset_x_millimeter": float(self.altcr_offset_x_spin_box.value()),
-                "altcr_offset_y_millimeter": float(self.altcr_offset_y_spin_box.value()),
-                "function_font_size_millimeter": float(self.function_font_size_spin_box.value()),
-                "function_offset_x_millimeter": float(self.function_offset_x_spin_box.value()),
-                "function_offset_y_millimeter": float(self.function_offset_y_spin_box.value()),
-                "depth_millimeter": float(self.depth_spin_box.value()),
-                "linear_deflection": float(self.linear_deflection_spin_box.value()),
-                "preview_label": self.preview_label_edit.text().strip(),
-                "include_variable_fonts": bool(self.include_variable_fonts_checkbox.isChecked()),
-                "enable_shift_legend": bool(self.shift_enabled_checkbox.isChecked()),
-                "enable_alternate_graphic_legend": bool(self.alternate_graphic_enabled_checkbox.isChecked()),
-                "enable_function_legend": bool(self.function_enabled_checkbox.isChecked()),
-            }
+    def collect_theme_configuration(self) -> ThemeConfiguration:
+        export_configuration = self.get_configuration_for_preview()
+        include_variable_fonts = bool(self.include_variable_fonts_checkbox.isChecked())
+        return ThemeConfiguration(
+            export_configuration=export_configuration,
+            include_variable_fonts=include_variable_fonts,
         )
-        return values
+
 
     def get_configuration_for_preview(self) -> ExportConfiguration:
         if len(self.solid_objects) == 0:
