@@ -1,4 +1,3 @@
-import csv
 import os
 from typing import Dict, List
 
@@ -9,21 +8,18 @@ from PySide2 import QtWidgets
 
 from keycap_exporter_core import (
     DEFAULT_FONT_DIRECTORIES,
-    FACE_DIRECTIONS,
     ExportConfiguration,
-    build_keycap_with_legend_shape,
+    build_keycap_shape_for_label,
+    build_legend_label,
     font_display_name,
     is_variable_font_filename,
     list_solid_objects,
     object_display_name,
+    read_layout_entries,
     remove_existing_preview,
     scan_font_files,
     set_preview_shape,
-    resolve_object_by_name,
-    best_face_for_direction,
-    ENGRAVING_DIRECTIONS,
-    FACE_ROTATION,
-    unit_vector,
+    FACE_DIRECTIONS,
 )
 
 
@@ -208,16 +204,10 @@ class BatchKeycapDialog(QtWidgets.QDialog):
 
         self.layout_file_edit.setText(path)
 
-        with open(path, newline="", encoding="utf-8") as file_handle:
-            reader = csv.DictReader(file_handle)
-            primary_label = ""
-            for row in reader:
-                primary_label = (row.get("primary") or "").strip()
-                if primary_label:
-                    break
-
-        if primary_label:
-            self.preview_label_edit.setText(primary_label)
+        entries = read_layout_entries(path)
+        if entries:
+            primary_label, _, shift_label = entries[0]
+            self.preview_label_edit.setText(build_legend_label(primary_label, shift_label))
 
     def get_configuration_for_preview(self) -> ExportConfiguration:
         if len(self.solid_objects) == 0:
@@ -261,28 +251,9 @@ class BatchKeycapDialog(QtWidgets.QDialog):
 
 
         generate_configuration = self.get_configuration_for_preview()
-
-        template_object = resolve_object_by_name(App.ActiveDocument, generate_configuration.template_object_name)
-        blank_key = template_object.Shape.copy()
-        direction = FACE_DIRECTIONS[generate_configuration.face_choice_label]
-        center = best_face_for_direction(blank_key, _direction=direction)
-        face_placement = App.Placement(
-            App.Vector(center.x, center.y, center.z),
-            FACE_ROTATION[generate_configuration.face_choice_label],
-            )
-
-        if generate_configuration.mode == "engrave":
-            extrusion_unit_vector = ENGRAVING_DIRECTIONS[generate_configuration.face_choice_label]
-        else:
-            extrusion_unit_vector = FACE_DIRECTIONS[generate_configuration.face_choice_label]
-        extrusion_vector = unit_vector(extrusion_unit_vector).multiply(generate_configuration.depth_millimeter)
-
-        preview_shape = build_keycap_with_legend_shape(
+        preview_shape = build_keycap_shape_for_label(
             document=self.document,
-            face_placement=face_placement,
-            extrusion_vector=extrusion_vector,
             configuration=generate_configuration,
-            blank_key= blank_key,
             label=generate_configuration.preview_label,
         )
         

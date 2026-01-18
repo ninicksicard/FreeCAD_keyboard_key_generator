@@ -1,3 +1,4 @@
+import csv
 import os
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
@@ -234,6 +235,55 @@ def set_preview_shape(document: App.Document, shape: Part.Shape) -> None:
         preview_object.Label = "__KEYCAP_PREVIEW__"
     preview_object.Shape = shape
     document.recompute()
+
+
+def read_layout_entries(layout_file_path: str) -> List[Tuple[str, str, str]]:
+    entries: List[Tuple[str, str, str]] = []
+    with open(layout_file_path, newline="", encoding="utf-8") as file_handle:
+        reader = csv.DictReader(file_handle)
+        for row in reader:
+            label_text = (row.get("primary") or "").strip()
+            name_text = (row.get("name") or "").strip()
+            shift_text = (row.get("shift") or "").strip()
+            if label_text:
+                entries.append((label_text, name_text or label_text, shift_text))
+    return entries
+
+
+def build_legend_label(primary_label: str, shift_label: str) -> str:
+    if shift_label:
+        return f"{primary_label}\n{shift_label}"
+    return primary_label
+
+
+def build_keycap_shape_for_label(
+        document: App.Document,
+        configuration: ExportConfiguration,
+        label: str,
+) -> Part.Shape:
+    template_object = resolve_object_by_name(document, configuration.template_object_name)
+    blank_key = template_object.Shape.copy()
+    direction = FACE_DIRECTIONS[configuration.face_choice_label]
+    center = best_face_for_direction(blank_key, _direction=direction)
+    face_placement = App.Placement(
+        App.Vector(center.x, center.y, center.z),
+        FACE_ROTATION[configuration.face_choice_label],
+    )
+
+    if configuration.mode == "engrave":
+        extrusion_unit_vector = ENGRAVING_DIRECTIONS[configuration.face_choice_label]
+    else:
+        extrusion_unit_vector = FACE_DIRECTIONS[configuration.face_choice_label]
+    extrusion_vector = unit_vector(extrusion_unit_vector).multiply(configuration.depth_millimeter)
+
+    return build_keycap_with_legend_shape(
+        document=document,
+        face_placement=face_placement,
+        extrusion_vector=extrusion_vector,
+        configuration=configuration,
+        blank_key=blank_key,
+        label=label,
+    )
 
 
 def build_keycap_with_legend_shape(
