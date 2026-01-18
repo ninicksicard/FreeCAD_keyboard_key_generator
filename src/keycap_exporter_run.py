@@ -49,6 +49,12 @@ def generate_keycaps_to_stl_from_selected_template() -> None:
     template_object = resolve_object_by_name(document, generate_configuration.template_object_name)
     template_shape = template_object.Shape.copy()
     for label_text, shift_text, altcr_text, function_text, name_text in entries:
+        if not generate_configuration.enable_shift_legend:
+            shift_text = ""
+        if not generate_configuration.enable_alternate_graphic_legend:
+            altcr_text = ""
+        if not generate_configuration.enable_function_legend:
+            function_text = ""
         final_solid = build_keycap_shape_from_configuration(
             document,
             template_shape,
