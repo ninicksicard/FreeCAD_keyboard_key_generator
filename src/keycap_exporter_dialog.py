@@ -75,6 +75,11 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         self.shift_font_size_spin_box.setDecimals(2)
         self.shift_font_size_spin_box.setValue(4.0)
 
+        self.altcr_font_size_spin_box = QtWidgets.QDoubleSpinBox()
+        self.altcr_font_size_spin_box.setRange(1.0, 50.0)
+        self.altcr_font_size_spin_box.setDecimals(2)
+        self.altcr_font_size_spin_box.setValue(4.0)
+
         self.depth_spin_box = QtWidgets.QDoubleSpinBox()
         self.depth_spin_box.setRange(0.05, 10.0)
         self.depth_spin_box.setDecimals(2)
@@ -99,6 +104,16 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         self.shift_offset_y_spin_box.setRange(-50.0, 50.0)
         self.shift_offset_y_spin_box.setDecimals(2)
         self.shift_offset_y_spin_box.setValue(2.0)
+
+        self.altcr_offset_x_spin_box = QtWidgets.QDoubleSpinBox()
+        self.altcr_offset_x_spin_box.setRange(-50.0, 50.0)
+        self.altcr_offset_x_spin_box.setDecimals(2)
+        self.altcr_offset_x_spin_box.setValue(2.0)
+
+        self.altcr_offset_y_spin_box = QtWidgets.QDoubleSpinBox()
+        self.altcr_offset_y_spin_box.setRange(-50.0, 50.0)
+        self.altcr_offset_y_spin_box.setDecimals(2)
+        self.altcr_offset_y_spin_box.setValue(-2.0)
 
         self.linear_deflection_spin_box = QtWidgets.QDoubleSpinBox()
         self.linear_deflection_spin_box.setRange(0.01, 2.0)
@@ -146,11 +161,14 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         form_layout.addRow("Legend mode:", self.mode_selector)
         form_layout.addRow("Primary font size (millimeter):", self.primary_font_size_spin_box)
         form_layout.addRow("Shift font size (millimeter):", self.shift_font_size_spin_box)
+        form_layout.addRow("AltGr font size (millimeter):", self.altcr_font_size_spin_box)
         form_layout.addRow("Depth or height (millimeter):", self.depth_spin_box)
         form_layout.addRow("Primary offset X (millimeter):", self.primary_offset_x_spin_box)
         form_layout.addRow("Primary offset Y (millimeter):", self.primary_offset_y_spin_box)
         form_layout.addRow("Shift offset X (millimeter):", self.shift_offset_x_spin_box)
         form_layout.addRow("Shift offset Y (millimeter):", self.shift_offset_y_spin_box)
+        form_layout.addRow("AltGr offset X (millimeter):", self.altcr_offset_x_spin_box)
+        form_layout.addRow("AltGr offset Y (millimeter):", self.altcr_offset_y_spin_box)
         form_layout.addRow("Mesh linear deflection:", self.linear_deflection_spin_box)
 
         preview_row = QtWidgets.QHBoxLayout()
@@ -241,11 +259,14 @@ class BatchKeycapDialog(QtWidgets.QDialog):
         for spin_box in (
             self.primary_font_size_spin_box,
             self.shift_font_size_spin_box,
+            self.altcr_font_size_spin_box,
             self.depth_spin_box,
             self.primary_offset_x_spin_box,
             self.primary_offset_y_spin_box,
             self.shift_offset_x_spin_box,
             self.shift_offset_y_spin_box,
+            self.altcr_offset_x_spin_box,
+            self.altcr_offset_y_spin_box,
             self.linear_deflection_spin_box,
         ):
             spin_box.interpretText()
@@ -269,6 +290,9 @@ class BatchKeycapDialog(QtWidgets.QDialog):
             shift_font_size_millimeter=float(self.shift_font_size_spin_box.value()),
             shift_offset_x_millimeter=float(self.shift_offset_x_spin_box.value()),
             shift_offset_y_millimeter=float(self.shift_offset_y_spin_box.value()),
+            altcr_font_size_millimeter=float(self.altcr_font_size_spin_box.value()),
+            altcr_offset_x_millimeter=float(self.altcr_offset_x_spin_box.value()),
+            altcr_offset_y_millimeter=float(self.altcr_offset_y_spin_box.value()),
             depth_millimeter=float(self.depth_spin_box.value()),
             linear_deflection=float(self.linear_deflection_spin_box.value()),
             preview_label=self.preview_label_edit.text().strip() or "A",
@@ -284,11 +308,12 @@ class BatchKeycapDialog(QtWidgets.QDialog):
 
         preview_label = generate_configuration.preview_label
         shift_label = None
+        altcr_label = None
         layout_file_path = generate_configuration.layout_file_path
         if layout_file_path and os.path.isfile(layout_file_path):
             entries = read_layout_entries(layout_file_path)
             if entries:
-                preview_label, shift_label, _ = entries[0]
+                preview_label, shift_label, altcr_label, _ = entries[0]
 
         preview_shape = build_keycap_shape_from_configuration(
             self.document,
@@ -296,6 +321,7 @@ class BatchKeycapDialog(QtWidgets.QDialog):
             generate_configuration,
             preview_label,
             shift_label,
+            altcr_label,
         )
 
         set_preview_shape(self.document, preview_shape)

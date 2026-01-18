@@ -93,6 +93,9 @@ class ExportConfiguration:
     shift_font_size_millimeter: float
     shift_offset_x_millimeter: float
     shift_offset_y_millimeter: float
+    altcr_font_size_millimeter: float
+    altcr_offset_x_millimeter: float
+    altcr_offset_y_millimeter: float
     depth_millimeter: float
     linear_deflection: float
     preview_label: str
@@ -125,16 +128,17 @@ def font_display_name(font_path: str) -> str:
     return os.path.basename(font_path)
 
 
-def read_layout_entries(layout_file_path: str) -> List[Tuple[str, str, str]]:
-    entries: List[Tuple[str, str, str]] = []
+def read_layout_entries(layout_file_path: str) -> List[Tuple[str, str, str, str]]:
+    entries: List[Tuple[str, str, str, str]] = []
     with open(layout_file_path, newline="", encoding="utf-8") as file_handle:
         reader = csv.DictReader(file_handle)
         for row in reader:
             label_text = (row.get("primary") or "").strip()
             shift_text = (row.get("shift") or "").strip()
+            altcr_text = (row.get("altcr") or "").strip()
             name_text = (row.get("name") or "").strip()
             if label_text:
-                entries.append((label_text, shift_text, name_text or label_text))
+                entries.append((label_text, shift_text, altcr_text, name_text or label_text))
     return entries
 
 
@@ -260,6 +264,7 @@ def build_keycap_with_legend_shape(
         blank_key,
         label: str,
         shift_label: Optional[str] = None,
+        altcr_label: Optional[str] = None,
 ) -> Part.Shape:
     def legend_solid_for_label(
         legend_label: str,
@@ -278,7 +283,7 @@ def build_keycap_with_legend_shape(
         return extrude_to_solid(legend_shape, extrusion_vector)
 
     legend_solids = []
-    if shift_label:
+    if shift_label or altcr_label:
         primary_offset_x_millimeter = configuration.primary_offset_x_millimeter
         primary_offset_y_millimeter = configuration.primary_offset_y_millimeter
     else:
@@ -303,6 +308,15 @@ def build_keycap_with_legend_shape(
                 configuration.shift_offset_y_millimeter,
             )
         )
+    if altcr_label:
+        legend_solids.append(
+            legend_solid_for_label(
+                altcr_label,
+                configuration.altcr_font_size_millimeter,
+                configuration.altcr_offset_x_millimeter,
+                configuration.altcr_offset_y_millimeter,
+            )
+        )
 
     legend_solid = legend_solids[0]
     for additional_solid in legend_solids[1:]:
@@ -322,6 +336,7 @@ def build_keycap_shape_from_configuration(
     configuration: ExportConfiguration,
     label: str,
     shift_label: Optional[str] = None,
+    altcr_label: Optional[str] = None,
 ) -> Part.Shape:
     direction = FACE_DIRECTIONS[configuration.face_choice_label]
     center = best_face_for_direction(template_shape, _direction=direction)
@@ -344,4 +359,5 @@ def build_keycap_shape_from_configuration(
         blank_key=template_shape,
         label=label,
         shift_label=shift_label,
+        altcr_label=altcr_label,
     )
