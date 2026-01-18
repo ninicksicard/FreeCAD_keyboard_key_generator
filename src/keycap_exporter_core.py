@@ -87,6 +87,9 @@ class ExportConfiguration:
     output_directory: str
     layout_file_path: str
     mode: str
+    enable_shift_legend: bool
+    enable_alternate_graphic_legend: bool
+    enable_function_legend: bool
     primary_font_size_millimeter: float
     primary_offset_x_millimeter: float
     primary_offset_y_millimeter: float
